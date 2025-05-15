@@ -1,7 +1,7 @@
 {
   "name": "raydiumcpmm",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
     "test": "npx ts-node main.ts",
     "start": "npx tsc && node main.ts"
