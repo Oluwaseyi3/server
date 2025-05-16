@@ -61,6 +61,198 @@ export class MeteorClient {
    * @param opts - Token options including name, symbol, supply, etc.
    * @returns PublicKey of the new mint and transaction ID
    */
+  // async createTokenWithMetadata(opts: {
+  //   name: string;
+  //   symbol: string;
+  //   decimals?: number;
+  //   supply?: number;
+  //   description?: string;
+  //   image?: string;
+  //   twitter?: string;
+  //   telegram?: string;
+  //   website?: string;
+  // }) {
+  //   try {
+  //     const mint = generateSigner(this.umi);
+
+  //     // Prepare metadata
+  //     const metadata = {
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       description: opts.description,
+  //       image: opts.image,
+  //       website: opts.website,
+  //       twitter: opts.twitter,
+  //       telegram: opts.telegram,
+  //     };
+
+  //     // Calculate token supply with decimals
+  //     const totalSupplyWithDecimals = new BN(opts.supply || 10000000000)
+  //       .mul(new BN(10).pow(new BN(opts.decimals || 9)))
+  //       .toString();
+
+  //     const uri = await uploadMetadata(metadata);
+
+  //     // Create token with metadata and mint the supply
+  //     const tx = await createAndMint(this.umi, {
+  //       mint,
+  //       authority: this.umi.identity,
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       uri: uri,
+  //       sellerFeeBasisPoints: percentAmount(0),
+  //       decimals: opts.decimals || 9,
+  //       amount: BigInt(totalSupplyWithDecimals),
+  //       //@ts-ignore
+  //       tokenOwner: this.wallet.publicKey,
+  //       tokenStandard: TokenStandard.Fungible,
+  //     }).send(this.umi);
+
+  //     console.log(`Successfully minted tokens (${mint.publicKey})`);
+  //     await sleep(8000);
+
+  //     if (SHOULD_REVOKE_AUTHORITY) {
+  //       const revokeTransaction = new Transaction();
+
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           this.wallet.publicKey,
+  //           AuthorityType.MintTokens,
+  //           null
+  //         )
+  //       );
+
+  //       // Add instruction to revoke freeze authority
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           this.wallet.publicKey,
+  //           AuthorityType.FreezeAccount,
+  //           null
+  //         )
+  //       );
+
+  //       // Sign and send the transaction
+  //       const revokeAuthorityTxId = await this.signAndBroadcastTx(
+  //         revokeTransaction
+  //       );
+
+  //       console.log(
+  //         `Successfully revoked mint and freeze authorities (${mint.publicKey})`
+  //       );
+  //     }
+
+  //     return {
+  //       mintAddress: mint.publicKey.toString(),
+  //       txId: tx,
+  //     };
+  //   } catch (error) {
+  //     console.error("Error minting tokens:", error);
+  //     throw error;
+  //   }
+  // }
+
+  // async createTokenWithMetadata(opts: {
+  //   name: string;
+  //   symbol: string;
+  //   decimals?: number;
+  //   supply?: number;
+  //   description?: string;
+  //   image?: string;
+  //   twitter?: string;
+  //   telegram?: string;
+  //   website?: string;
+  // }) {
+  //   try {
+  //     const mint = generateSigner(this.umi);
+
+  //     // Prepare metadata
+  //     const metadata = {
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       description: opts.description,
+  //       image: opts.image,
+  //       website: opts.website,
+  //       twitter: opts.twitter,
+  //       telegram: opts.telegram,
+  //     };
+
+  //     // Calculate token supply with decimals
+  //     const totalSupplyWithDecimals = new BN(opts.supply || 10000000000)
+  //       .mul(new BN(10).pow(new BN(opts.decimals || 9)))
+  //       .toString();
+
+  //     const uri = await uploadMetadata(metadata);
+
+  //     // Create token with metadata and mint the supply
+  //     const tx = await createAndMint(this.umi, {
+  //       mint,
+  //       authority: this.umi.identity,
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       uri: uri,
+  //       sellerFeeBasisPoints: percentAmount(0),
+  //       decimals: opts.decimals || 9,
+  //       amount: BigInt(totalSupplyWithDecimals),
+  //       //@ts-ignore
+  //       tokenOwner: this.wallet.publicKey,
+  //       tokenStandard: TokenStandard.Fungible,
+  //     }).send(this.umi);
+
+  //     console.log(`Successfully minted tokens (${mint.publicKey})`);
+  //     await sleep(8000);
+
+  //     if (SHOULD_REVOKE_AUTHORITY) {
+  //       const revokeTransaction = new Transaction();
+
+  //       // Convert UMI identity to regular PublicKey for the authority
+  //       const currentAuthority = new PublicKey(this.umi.identity.publicKey.toString());
+
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           currentAuthority,  // <-- Use UMI identity as current authority
+  //           AuthorityType.MintTokens,
+  //           null
+  //         )
+  //       );
+
+  //       // Add instruction to revoke freeze authority
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           currentAuthority,  // <-- Use UMI identity as current authority
+  //           AuthorityType.FreezeAccount,
+  //           null
+  //         )
+  //       );
+
+  //       // Sign and send the transaction
+  //       const revokeAuthorityTxId = await this.signAndBroadcastTx(
+  //         revokeTransaction
+  //       );
+
+  //       console.log(
+  //         `Successfully revoked mint and freeze authorities (${mint.publicKey})`
+  //       );
+  //     }
+
+  //     return {
+  //       mintAddress: mint.publicKey.toString(),
+  //       txId: tx,
+  //     };
+  //   } catch (error) {
+  //     console.error("Error minting tokens:", error);
+  //     throw error;
+  //   }
+  // }
+
+  /**
+ * Create a new SPL token mint and attach metadata
+ * @param opts - Token options including name, symbol, supply, etc.
+ * @returns PublicKey of the new mint and transaction ID
+ */
   async createTokenWithMetadata(opts: {
     name: string;
     symbol: string;
@@ -114,10 +306,13 @@ export class MeteorClient {
       if (SHOULD_REVOKE_AUTHORITY) {
         const revokeTransaction = new Transaction();
 
+        // ✅ FIX: Use UMI identity as the current authority, not wallet
+        const currentAuthority = new PublicKey(this.umi.identity.publicKey.toString());
+
         revokeTransaction.add(
           createSetAuthorityInstruction(
             new PublicKey(mint.publicKey.toString()),
-            this.wallet.publicKey,
+            currentAuthority,  // ✅ Changed from this.wallet.publicKey
             AuthorityType.MintTokens,
             null
           )
@@ -127,7 +322,7 @@ export class MeteorClient {
         revokeTransaction.add(
           createSetAuthorityInstruction(
             new PublicKey(mint.publicKey.toString()),
-            this.wallet.publicKey,
+            currentAuthority,  // ✅ Changed from this.wallet.publicKey
             AuthorityType.FreezeAccount,
             null
           )
