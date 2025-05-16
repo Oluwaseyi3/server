@@ -7,7 +7,6 @@ import { getSPLBalance } from "./utils";
 import { CronJob } from "cron";
 import { setupApi } from "./api";
 
-
 export const txCron = new CronJob(
   '0 02 * * * *', // Runs at the 0th second of the 0th minute of every hour
   async function () {
@@ -27,12 +26,14 @@ export const txCron = new CronJob(
 );
 
 async function startApp() {
-  const port = process.env.PORT || 3000;
+  // Use PORT environment variable or fallback to 10000 (Render's default)
+  const port = process.env.PORT || 10000;
   console.log("Initializing application...");
+  console.log(`Using port: ${port}`);
 
   // 1. Setup API Server
   try {
-    setupApi(port); // This will start listening
+    setupApi(port); // This will start listening on 0.0.0.0:port
   } catch (err) {
     console.error("Failed to setup API server:", err);
     process.exit(1);
@@ -59,7 +60,6 @@ process.on('uncaughtException', (error) => {
   // It's often recommended to gracefully shut down the process after an uncaught exception
   process.exit(1);
 });
-
 
 // --- RUN THE APP ---
 startApp().catch(err => {
