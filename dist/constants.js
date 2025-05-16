@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -70,23 +61,23 @@ exports.exportedKeyPair = web3_js_1.Keypair.fromSecretKey(new Uint8Array(exports
 exports.wallet = new nodewallet_1.default(web3_js_1.Keypair.fromSecretKey(new Uint8Array(exports.keypair.secretKey)));
 exports.publicKey = "Gnkp9MZSFAs6af6i6zYZJFHMb5RaezXZiKUBRKXTmqbM";
 let raydium;
-const initSdk = (params) => __awaiter(void 0, void 0, void 0, function* () {
+const initSdk = async (params) => {
     if (raydium)
         return raydium;
     if (exports.rpcConnection.rpcEndpoint === exports.rpcConnection.rpcEndpoint)
         console.warn("using free rpc node might cause unexpected error, strongly suggest uses paid rpc node");
     console.log(`connect to rpc ${exports.rpcConnection.rpcEndpoint} in ${exports.cluster}`);
-    raydium = yield raydium_sdk_v2_1.Raydium.load({
-        owner: (params === null || params === void 0 ? void 0 : params.owner) || exports.wallet.payer,
+    raydium = await raydium_sdk_v2_1.Raydium.load({
+        owner: params?.owner || exports.wallet.payer,
         connection: exports.rpcConnection,
         cluster: exports.cluster,
         disableFeatureCheck: true,
-        disableLoadToken: !(params === null || params === void 0 ? void 0 : params.loadToken),
+        disableLoadToken: !params?.loadToken,
         blockhashCommitment: "finalized",
         // urlConfigs: {
         //   BASE_HOST: '<API_HOST>', // api url configs, currently api doesn't support devnet
         // },
     });
     return raydium;
-});
+};
 exports.initSdk = initSdk;

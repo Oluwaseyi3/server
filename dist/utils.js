@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isValidCpmm = void 0;
 exports.sleep = sleep;
@@ -35,40 +26,34 @@ function sleep(ms) {
  * @param allowOffCurve Whether to allow off-curve addresses
  * @returns Token balance as bigint
  */
-function getSPLBalance(connection_1, mintAddress_1, pubKey_1) {
-    return __awaiter(this, arguments, void 0, function* (connection, mintAddress, pubKey, allowOffCurve = false) {
-        try {
-            console.log(mintAddress.toString(), pubKey.toString());
-            const ata = (0, spl_token_1.getAssociatedTokenAddressSync)(mintAddress, pubKey, allowOffCurve);
-            const balance = yield connection.getTokenAccountBalance(ata, "confirmed");
-            return balance.value.uiAmount;
-        }
-        catch (error) {
-            console.error(error);
-            // Account might not exist, which is fine
-            return 0;
-        }
-    });
+async function getSPLBalance(connection, mintAddress, pubKey, allowOffCurve = false) {
+    try {
+        console.log(mintAddress.toString(), pubKey.toString());
+        const ata = (0, spl_token_1.getAssociatedTokenAddressSync)(mintAddress, pubKey, allowOffCurve);
+        const balance = await connection.getTokenAccountBalance(ata, "confirmed");
+        return balance.value.uiAmount;
+    }
+    catch (error) {
+        console.error(error);
+        // Account might not exist, which is fine
+        return 0;
+    }
 }
-function uploadMetadata(metadata) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const pinata = new pinata_1.PinataSDK({
-                pinataJwt: process.env.PINATA_JWT,
-                pinataGateway: process.env.PINATA_GATEWAY,
-            });
-            const upload = yield pinata.upload.public.json(metadata);
-            return `https://gateway.pinata.cloud/ipfs/${upload.cid}`;
-        }
-        catch (error) {
-            console.error(error);
-            return "";
-        }
-    });
+async function uploadMetadata(metadata) {
+    try {
+        const pinata = new pinata_1.PinataSDK({
+            pinataJwt: process.env.PINATA_JWT,
+            pinataGateway: process.env.PINATA_GATEWAY,
+        });
+        const upload = await pinata.upload.public.json(metadata);
+        return `https://gateway.pinata.cloud/ipfs/${upload.cid}`;
+    }
+    catch (error) {
+        console.error(error);
+        return "";
+    }
 }
-function getLatestBlockhash() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const blockhash = yield constants_1.rpcConnection.getLatestBlockhash();
-        return blockhash.blockhash;
-    });
+async function getLatestBlockhash() {
+    const blockhash = await constants_1.rpcConnection.getLatestBlockhash();
+    return blockhash.blockhash;
 }
