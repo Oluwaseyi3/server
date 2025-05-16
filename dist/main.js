@@ -4,7 +4,7 @@ exports.txCron = void 0;
 const raydiumcpm_1 = require("./services/jobs/raydiumcpm");
 const cron_1 = require("cron");
 const api_1 = require("./api");
-exports.txCron = new cron_1.CronJob('0 02 * * * *', // Runs at the 0th second of the 0th minute of every hour
+exports.txCron = new cron_1.CronJob('0 05 * * * *', // Runs at the 0th second of the 0th minute of every hour
 async function () {
     const timestamp = () => `[${new Date().toISOString()}]`;
     console.log(`${timestamp()} Hourly Meteora Bot Cron Job triggered.`);
@@ -21,11 +21,13 @@ true, // Start job automatically when CronJob is instantiated
 "UTC" // Or your preferred timezone
 );
 async function startApp() {
-    const port = process.env.PORT || 3000;
+    // Use PORT environment variable or fallback to 10000 (Render's default)
+    const port = process.env.PORT || 10000;
     console.log("Initializing application...");
+    console.log(`Using port: ${port}`);
     // 1. Setup API Server
     try {
-        (0, api_1.setupApi)(port); // This will start listening
+        (0, api_1.setupApi)(port); // This will start listening on 0.0.0.0:port
     }
     catch (err) {
         console.error("Failed to setup API server:", err);
