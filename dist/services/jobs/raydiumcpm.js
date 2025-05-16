@@ -34,93 +34,18 @@ async function withdrawLiquidityFromMeteora(poolId, positionId, tokenMintForLogg
         console.error(`${timestamp()} Error withdrawing from Meteora pool ${poolId}:`, err);
     }
 }
-// export async function runBotMeteora() {
-//   console.log(`${timestamp()} Starting Meteora Bot...`);
-//   let state = await readState();
-//   const meteoraClient = new MeteorClient(keypair.secretKey as any);
-//   const currentIteration = (state.iteration || 0) + 1;
-//   // Detect and log if previous liquidity wasn't withdrawn
-//   if (state.currentPoolId && state.currentPositionId && !state.liquidityWithdrawn) {
-//     console.warn(`${timestamp()} WARNING: Previous pool ${state.currentPoolId} still marked as unwithdrawn.`);
-//   }
-//   // --- Step 1: Create new PERP token ---
-//   const tokenSymbol = `PERP${currentIteration}`;
-//   const tokenName = "PERPRUG.FUN";
-//   const tokenConfig = {
-//     ...perpTokenConfig,
-//     name: tokenName,
-//     symbol: tokenSymbol,
-//   };
-//   let newTokenMint: string;
-//   try {
-//     console.log(`${timestamp()} Creating token ${tokenSymbol}...`);
-//     const { mintAddress, txId } = await meteoraClient.createTokenWithMetadata(tokenConfig);
-//     if (!mintAddress || !txId) throw new Error("Invalid token creation result.");
-//     newTokenMint = mintAddress;
-//     console.log(`${timestamp()} Token created: ${newTokenMint}. Tx: ${txId}`);
-//   } catch (err) {
-//     console.error(`${timestamp()} Token creation failed:`, err);
-//     throw err;
-//   }
-//   await sleep(5000); // Ensure token is propagated
-//   // --- Step 2: Create Meteora Pool ---
-//   const tokenA = newTokenMint;
-//   const tokenB = SOL_MINT;
-//   const mintAamount = Math.floor(perpTokenConfig.supply * (10 ** perpTokenConfig.decimals) * PERP_TOKEN_DEPOSIT_PERCENTAGE);
-//   const mintBamount = SOL_AMOUNT_TO_DEPOSIT_METEORA;
-//   let poolId: string;
-//   let positionId: string;
-//   try {
-//     console.log(`${timestamp()} Creating pool with ${tokenA} and ${tokenB}...`);
-//     const { poolId: pid, positionId: posId, txId } = await meteoraClient.createPool({
-//       tokenA,
-//       tokenB,
-//       mintAamount,
-//       mintBamount,
-//     });
-//     if (!pid || !posId || !txId) throw new Error("Invalid pool creation result.");
-//     poolId = pid;
-//     positionId = posId;
-//     console.log(`${timestamp()} Pool created: Pool ID = ${poolId}, Position ID = ${positionId}. Tx: ${txId}`);
-//     state = {
-//       ...state,
-//       iteration: currentIteration,
-//       createdTokenAddress: newTokenMint,
-//       currentPoolId: poolId,
-//       currentPositionId: positionId,
-//       liquidityWithdrawn: false,
-//     };
-//     await writeState(state);
-//     console.log(`${timestamp()} State updated for new pool.`);
-//   } catch (err) {
-//     console.error(`${timestamp()} Pool creation failed:`, err);
-//     throw err;
-//   }
-//   // --- Step 3: Schedule Liquidity Withdrawal ---
-//   const minDelay = 15 * 60 * 1000; // 15 mins
-//   const maxDelay = 45 * 60 * 1000; // 45 mins
-//   const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-//   const when = new Date(Date.now() + delay).toLocaleTimeString();
-//   console.log(`${timestamp()} Scheduling liquidity withdrawal in ${(delay / 60000).toFixed(1)} mins (~${when}).`);
-//   setTimeout(() => {
-//     withdrawLiquidityFromMeteora(poolId, positionId, newTokenMint).catch(err =>
-//       console.error(`${timestamp()} Unhandled withdrawal error:`, err)
-//     );
-//   }, delay);
-//   console.log(`${timestamp()} Bot cycle ${state.iteration} completed.`);
-//   console.log(`${timestamp()} Final State:`, JSON.stringify(await readState(), null, 2));
-// }
 async function runBotMeteora() {
     console.log(`${timestamp()} Starting Meteora Bot...`);
     let state = await (0, stateManager_1.readState)();
     const meteoraClient = new Meteora_1.MeteorClient(constants_1.keypair.secretKey);
-    const currentIteration = state.iteration + 1;
+    // ✅ Don't increment iteration yet - only after successful token creation
+    const tentativeIteration = state.iteration + 1;
     // Detect and log if previous liquidity wasn't withdrawn
     if (state.currentPoolId && state.currentPositionId && !state.liquidityWithdrawn) {
         console.warn(`${timestamp()} WARNING: Previous pool ${state.currentPoolId} still marked as unwithdrawn.`);
     }
     // --- Step 1: Create new PERP token ---
-    const tokenSymbol = `PERP${currentIteration}`;
+    const tokenSymbol = `PERP${tentativeIteration}`;
     const tokenName = "PERPRUG.FUN";
     const tokenConfig = {
         ...constants_1.perpTokenConfig,
@@ -135,16 +60,31 @@ async function runBotMeteora() {
             throw new Error("Invalid token creation result.");
         newTokenMint = mintAddress;
         console.log(`${timestamp()} Token created: ${newTokenMint}. Tx: ${txId}`);
+        // ✅ Token creation successful - NOW increment the iteration
+        const currentIteration = tentativeIteration;
+        // Update state immediately after successful token creation
+        state = {
+            ...state,
+            iteration: currentIteration,
+            createdTokenAddress: newTokenMint,
+            // Reset pool/position info for the new iteration
+            currentPoolId: null,
+            currentPositionId: null,
+            liquidityWithdrawn: false,
+        };
+        await (0, stateManager_1.writeState)(state);
+        console.log(`${timestamp()} State updated after successful token creation. New iteration: ${currentIteration}`);
     }
     catch (err) {
         console.error(`${timestamp()} Token creation failed:`, err);
+        console.log(`${timestamp()} Iteration NOT incremented due to token creation failure.`);
         throw err;
     }
     await (0, utils_1.sleep)(5000); // Ensure token is propagated
     // --- Step 2: Create Meteora Pool ---
     const tokenA = newTokenMint;
     const tokenB = constants_1.SOL_MINT;
-    const mintAamount = Math.floor(constants_1.perpTokenConfig.supply * constants_1.PERP_TOKEN_DEPOSIT_PERCENTAGE); // Keep as number
+    const mintAamount = Math.floor(constants_1.perpTokenConfig.supply * constants_1.PERP_TOKEN_DEPOSIT_PERCENTAGE);
     const mintBamount = constants_1.SOL_AMOUNT_TO_DEPOSIT_METEORA;
     let poolId;
     let positionId;
@@ -153,7 +93,7 @@ async function runBotMeteora() {
         const { poolId: pid, positionId: posId, txId } = await meteoraClient.createPool({
             tokenA,
             tokenB,
-            mintAamount, // Pass the number
+            mintAamount,
             mintBamount,
         });
         if (!pid || !posId || !txId)
@@ -161,16 +101,14 @@ async function runBotMeteora() {
         poolId = pid;
         positionId = posId;
         console.log(`${timestamp()} Pool created: Pool ID = ${poolId}, Position ID = ${positionId}. Tx: ${txId}`);
+        // Update state with pool information
         state = {
             ...state,
-            iteration: currentIteration,
-            createdTokenAddress: newTokenMint,
             currentPoolId: poolId,
             currentPositionId: positionId,
-            liquidityWithdrawn: false,
         };
         await (0, stateManager_1.writeState)(state);
-        console.log(`${timestamp()} State updated for new pool.`);
+        console.log(`${timestamp()} State updated with pool information.`);
     }
     catch (err) {
         console.error(`${timestamp()} Pool creation failed:`, err);
