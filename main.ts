@@ -8,7 +8,7 @@ import { CronJob } from "cron";
 import { setupApi } from "./api";
 
 export const txCron = new CronJob(
-  '0 07 * * * *', // Runs at the 0th second of the 0th minute of every hour
+  '0 00 * * * *', // Runs at the 0th second of the 0th minute of every hour
   async function () {
     const timestamp = () => `[${new Date().toISOString()}]`;
     console.log(`${timestamp()} Hourly Meteora Bot Cron Job triggered.`);
