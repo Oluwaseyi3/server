@@ -31,8 +31,8 @@ exports.perpTokenConfig = {
     telegram: "https://t.me/PerpRug",
     website: "https://perprug.fun",
 };
-exports.SOL_AMOUNT_TO_DEPOSIT_METEORA = 0.03;
-exports.PERP_TOKEN_DEPOSIT_PERCENTAGE = 0.99; // e.g., deposit 99% of the new PERP token
+exports.SOL_AMOUNT_TO_DEPOSIT_METEORA = 0.5;
+exports.PERP_TOKEN_DEPOSIT_PERCENTAGE = 1; // e.g., deposit 99% of the new PERP token
 exports.TOKENA_PROGRAM_ID = spl_token_1.TOKEN_PROGRAM_ID;
 exports.TOKENB_PROGRAM_ID = spl_token_1.TOKEN_PROGRAM_ID;
 exports.SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";

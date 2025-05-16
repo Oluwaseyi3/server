@@ -42,8 +42,8 @@ export const perpTokenConfig = {
 
 };
 
-export const SOL_AMOUNT_TO_DEPOSIT_METEORA = 0.03;
-export const PERP_TOKEN_DEPOSIT_PERCENTAGE = 0.99; // e.g., deposit 99% of the new PERP token
+export const SOL_AMOUNT_TO_DEPOSIT_METEORA = 0.5;
+export const PERP_TOKEN_DEPOSIT_PERCENTAGE = 1; // e.g., deposit 99% of the new PERP token
 export const TOKENA_PROGRAM_ID = TOKEN_PROGRAM_ID;
 export const TOKENB_PROGRAM_ID = TOKEN_PROGRAM_ID;
 
