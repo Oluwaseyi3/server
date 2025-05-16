@@ -1,7 +1,7 @@
 {
-  "iteration": 35,
-  "createdTokenAddress": "9EEmLAiAie4XTFyHief63QVCmRuLcSSbBwNiejtf9s7C",
-  "currentPoolId": "2THQgx8tpPzjsr1s7iKnfb1fc9x4cFskkwA97sNV882v",
-  "currentPositionId": "ECt6U9ndAqJjeZmLHcWNFRTW9pFsuojUkVujWfPkAYGS",
-  "liquidityWithdrawn": false
+  "iteration": 37,
+  "createdTokenAddress": null,
+  "currentPoolId": null,
+  "currentPositionId": null,
+  "liquidityWithdrawn": true
 }
