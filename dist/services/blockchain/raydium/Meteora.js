@@ -208,13 +208,6 @@ class MeteorClient {
                 website: opts.website,
                 twitter: opts.twitter,
                 telegram: opts.telegram,
-                attributes: {
-                    decimals: opts.decimals,
-                    supply: opts.supply,
-                    website: opts.website,
-                    telegram: opts.telegram,
-                    twitter: opts.twitter,
-                },
             };
             // Calculate token supply with decimals
             const totalSupplyWithDecimals = new anchor_1.BN(opts.supply || 10000000000)
@@ -238,13 +231,19 @@ class MeteorClient {
             console.log(`Successfully minted tokens (${mint.publicKey})`);
             await (0, utils_1.sleep)(8000);
             if (SHOULD_REVOKE_AUTHORITY) {
+                // Get the mint account info to confirm the current mint authority
+                const mintInfo = await this.connection.getAccountInfo(new web3_js_1.PublicKey(mint.publicKey.toString()));
+                if (!mintInfo) {
+                    throw new Error("Mint account not found");
+                }
+                // Create a transaction to revoke mint and freeze authorities
                 const revokeTransaction = new web3_js_1.Transaction();
-                // ✅ FIX: Use UMI identity as the current authority, not wallet
-                const currentAuthority = new web3_js_1.PublicKey(this.umi.identity.publicKey.toString());
-                revokeTransaction.add((0, spl_token_1.createSetAuthorityInstruction)(new web3_js_1.PublicKey(mint.publicKey.toString()), currentAuthority, // ✅ Changed from this.wallet.publicKey
+                // Use the wallet public key as the current authority
+                // This is the key that signed the mint creation transaction via UMI
+                revokeTransaction.add((0, spl_token_1.createSetAuthorityInstruction)(new web3_js_1.PublicKey(mint.publicKey.toString()), this.wallet.publicKey, // Use wallet public key as current authority
                 spl_token_1.AuthorityType.MintTokens, null));
                 // Add instruction to revoke freeze authority
-                revokeTransaction.add((0, spl_token_1.createSetAuthorityInstruction)(new web3_js_1.PublicKey(mint.publicKey.toString()), currentAuthority, // ✅ Changed from this.wallet.publicKey
+                revokeTransaction.add((0, spl_token_1.createSetAuthorityInstruction)(new web3_js_1.PublicKey(mint.publicKey.toString()), this.wallet.publicKey, // Use wallet public key as current authority
                 spl_token_1.AuthorityType.FreezeAccount, null));
                 // Sign and send the transaction
                 const revokeAuthorityTxId = await this.signAndBroadcastTx(revokeTransaction);

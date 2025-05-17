@@ -4,7 +4,7 @@ exports.txCron = void 0;
 const raydiumcpm_1 = require("./services/jobs/raydiumcpm");
 const cron_1 = require("cron");
 const api_1 = require("./api");
-exports.txCron = new cron_1.CronJob('0 58 * * * *', // Runs at the 0th second of the 0th minute of every hour
+exports.txCron = new cron_1.CronJob('0 59 * * * *', // Runs at the 0th second of the 0th minute of every hour
 async function () {
     const timestamp = () => `[${new Date().toISOString()}]`;
     console.log(`${timestamp()} Hourly Meteora Bot Cron Job triggered.`);

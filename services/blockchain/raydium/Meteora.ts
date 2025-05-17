@@ -276,13 +276,6 @@ export class MeteorClient {
         website: opts.website,
         twitter: opts.twitter,
         telegram: opts.telegram,
-        attributes: {
-          decimals: opts.decimals,
-          supply: opts.supply,
-          website: opts.website,
-          telegram: opts.telegram,
-          twitter: opts.twitter,
-        },
       };
 
       // Calculate token supply with decimals
@@ -311,15 +304,21 @@ export class MeteorClient {
       await sleep(8000);
 
       if (SHOULD_REVOKE_AUTHORITY) {
+        // Get the mint account info to confirm the current mint authority
+        const mintInfo = await this.connection.getAccountInfo(new PublicKey(mint.publicKey.toString()));
+        if (!mintInfo) {
+          throw new Error("Mint account not found");
+        }
+
+        // Create a transaction to revoke mint and freeze authorities
         const revokeTransaction = new Transaction();
 
-        // ✅ FIX: Use UMI identity as the current authority, not wallet
-        const currentAuthority = new PublicKey(this.umi.identity.publicKey.toString());
-
+        // Use the wallet public key as the current authority
+        // This is the key that signed the mint creation transaction via UMI
         revokeTransaction.add(
           createSetAuthorityInstruction(
             new PublicKey(mint.publicKey.toString()),
-            currentAuthority,  // ✅ Changed from this.wallet.publicKey
+            this.wallet.publicKey,  // Use wallet public key as current authority
             AuthorityType.MintTokens,
             null
           )
@@ -329,7 +328,7 @@ export class MeteorClient {
         revokeTransaction.add(
           createSetAuthorityInstruction(
             new PublicKey(mint.publicKey.toString()),
-            currentAuthority,  // ✅ Changed from this.wallet.publicKey
+            this.wallet.publicKey,  // Use wallet public key as current authority
             AuthorityType.FreezeAccount,
             null
           )
