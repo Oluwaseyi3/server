@@ -706,21 +706,69 @@ export class MeteorClient {
     }
   }
   // Can you help me write a meteora client function that cremoves liquidity and closes all accounts at once
-
   async signAndBroadcastTx(tx: Transaction, otherSigner?: Keypair) {
-    const blockhash = await getLatestBlockhash();
-    tx.feePayer = this.wallet.publicKey;
-    tx.recentBlockhash = blockhash;
-    if (otherSigner) {
-      tx.sign(this.wallet, otherSigner);
-    } else {
-      tx.sign(this.wallet);
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        console.log(`Transaction attempt ${attempts}/${maxAttempts}`);
+
+        // Always get a fresh blockhash for each attempt
+        const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash({
+          commitment: "confirmed"
+        });
+        console.log(`Using blockhash: ${blockhash.substring(0, 10)}... (valid until height: ${lastValidBlockHeight})`);
+
+        tx.feePayer = this.wallet.publicKey;
+        tx.recentBlockhash = blockhash;
+
+        // Sign the transaction
+        if (otherSigner) {
+          tx.sign(this.wallet, otherSigner);
+        } else {
+          tx.sign(this.wallet);
+        }
+
+        console.log(`Sending from ${this.wallet.publicKey.toString()}`);
+
+        // Send with retry options
+        const txId = await this.connection.sendRawTransaction(tx.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: "confirmed",
+          maxRetries: 2
+        });
+
+        console.log(`Transaction sent: ${txId}`);
+
+        // Wait for confirmation
+        const confirmation = await this.connection.confirmTransaction({
+          signature: txId,
+          blockhash,
+          lastValidBlockHeight
+        }, "confirmed");
+
+        if (confirmation.value.err) {
+          throw new Error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
+        }
+
+        console.log(`Transaction confirmed: ${txId}`);
+        return txId;
+      } catch (error: any) {
+        console.error(`Transaction attempt ${attempts} failed: ${error.message || error}`);
+
+        if (attempts >= maxAttempts) {
+          throw error;
+        }
+
+        // Wait before retry with exponential backoff
+        const backoffMs = Math.min(1000 * Math.pow(2, attempts - 1), 5000);
+        console.log(`Waiting ${backoffMs}ms before retrying transaction...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
     }
-    console.log(this.wallet.publicKey.toString());
-    const txId = await this.connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
-    });
-    return txId;
+
+    throw new Error('Failed to send transaction after maximum attempts');
   }
 }
