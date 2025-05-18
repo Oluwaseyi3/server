@@ -253,6 +253,106 @@ export class MeteorClient {
  * @param opts - Token options including name, symbol, supply, etc.
  * @returns PublicKey of the new mint and transaction ID
  */
+  // async createTokenWithMetadata(opts: {
+  //   name: string;
+  //   symbol: string;
+  //   decimals?: number;
+  //   supply?: number;
+  //   description?: string;
+  //   image?: string;
+  //   twitter?: string;
+  //   telegram?: string;
+  //   website?: string;
+  // }) {
+  //   try {
+  //     const mint = generateSigner(this.umi);
+
+  //     // Prepare metadata
+  //     const metadata = {
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       description: opts.description,
+  //       image: opts.image,
+  //       website: opts.website,
+  //       twitter: opts.twitter,
+  //       telegram: opts.telegram,
+  //     };
+
+  //     // Calculate token supply with decimals
+  //     const totalSupplyWithDecimals = new BN(opts.supply || 10000000000)
+  //       .mul(new BN(10).pow(new BN(opts.decimals || 9)))
+  //       .toString();
+
+  //     const uri = await uploadMetadata(metadata);
+
+  //     // Create token with metadata and mint the supply
+  //     const tx = await createAndMint(this.umi, {
+  //       mint,
+  //       authority: this.umi.identity,
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       uri: uri,
+  //       sellerFeeBasisPoints: percentAmount(0),
+  //       decimals: opts.decimals || 9,
+  //       amount: BigInt(totalSupplyWithDecimals),
+  //       //@ts-ignore
+  //       tokenOwner: this.wallet.publicKey,
+  //       tokenStandard: TokenStandard.Fungible,
+  //     }).send(this.umi);
+
+  //     console.log(`Successfully minted tokens (${mint.publicKey})`);
+  //     await sleep(8000);
+
+  //     if (SHOULD_REVOKE_AUTHORITY) {
+  //       // Get the mint account info to confirm the current mint authority
+  //       const mintInfo = await this.connection.getAccountInfo(new PublicKey(mint.publicKey.toString()));
+  //       if (!mintInfo) {
+  //         throw new Error("Mint account not found");
+  //       }
+
+  //       // Create a transaction to revoke mint and freeze authorities
+  //       const revokeTransaction = new Transaction();
+
+  //       // Use the wallet public key as the current authority
+  //       // This is the key that signed the mint creation transaction via UMI
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           this.wallet.publicKey,  // Use wallet public key as current authority
+  //           AuthorityType.MintTokens,
+  //           null
+  //         )
+  //       );
+
+  //       // Add instruction to revoke freeze authority
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           this.wallet.publicKey,  // Use wallet public key as current authority
+  //           AuthorityType.FreezeAccount,
+  //           null
+  //         )
+  //       );
+
+  //       // Sign and send the transaction
+  //       const revokeAuthorityTxId = await this.signAndBroadcastTx(
+  //         revokeTransaction
+  //       );
+
+  //       console.log(
+  //         `Successfully revoked mint and freeze authorities (${mint.publicKey})`
+  //       );
+  //     }
+
+  //     return {
+  //       mintAddress: mint.publicKey.toString(),
+  //       txId: tx,
+  //     };
+  //   } catch (error) {
+  //     console.error("Error minting tokens:", error);
+  //     throw error;
+  //   }
+  // }
   async createTokenWithMetadata(opts: {
     name: string;
     symbol: string;
@@ -301,20 +401,42 @@ export class MeteorClient {
       }).send(this.umi);
 
       console.log(`Successfully minted tokens (${mint.publicKey})`);
-      await sleep(8000);
+
+      // Add a longer delay to ensure network propagation - increased from 8 to 15 seconds
+      await sleep(15000);
 
       if (SHOULD_REVOKE_AUTHORITY) {
-        // Get the mint account info to confirm the current mint authority
-        const mintInfo = await this.connection.getAccountInfo(new PublicKey(mint.publicKey.toString()));
-        if (!mintInfo) {
-          throw new Error("Mint account not found");
+        // Implement a retry mechanism for getting the mint account info
+        const maxAttempts = 5;
+        let mintInfo = null;
+        let attempt = 0;
+
+        while (attempt < maxAttempts) {
+          try {
+            // Get the mint account info to confirm the current mint authority
+            mintInfo = await this.connection.getAccountInfo(new PublicKey(mint.publicKey.toString()));
+            if (mintInfo) {
+              // Found the account, break out of retry loop
+              break;
+            }
+            console.log(`Mint account not yet available, attempt ${attempt + 1}/${maxAttempts}`);
+          } catch (e) {
+            console.log(`Error fetching mint account, attempt ${attempt + 1}/${maxAttempts}:`, e);
+          }
+
+          // Increase delay between retries
+          await sleep(5000 * (attempt + 1));
+          attempt++;
         }
 
-        // Create a transaction to revoke mint and freeze authorities
+        if (!mintInfo) {
+          throw new Error("Mint account not found after multiple attempts");
+        }
+
+        // Now we've confirmed the mint account exists, create a transaction to revoke authorities
         const revokeTransaction = new Transaction();
 
         // Use the wallet public key as the current authority
-        // This is the key that signed the mint creation transaction via UMI
         revokeTransaction.add(
           createSetAuthorityInstruction(
             new PublicKey(mint.publicKey.toString()),
@@ -334,7 +456,7 @@ export class MeteorClient {
           )
         );
 
-        // Sign and send the transaction
+        // Sign and send the transaction with more retries
         const revokeAuthorityTxId = await this.signAndBroadcastTx(
           revokeTransaction
         );
@@ -353,7 +475,6 @@ export class MeteorClient {
       throw error;
     }
   }
-
   /**
    * Create a pool using the Meteor CP-AMM
    * @param opts - Pool creation options
