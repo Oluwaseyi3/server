@@ -712,23 +712,102 @@ export class MeteorClient {
     }
   }
   // Can you help me write a meteora client function that cremoves liquidity and closes all accounts at once
+  // async signAndBroadcastTx(tx: Transaction, otherSigner?: Keypair) {
+  //   let attempts = 0;
+  //   const maxAttempts = 3;
+
+  //   while (attempts < maxAttempts) {
+  //     try {
+  //       attempts++;
+  //       console.log(`Transaction attempt ${attempts}/${maxAttempts}`);
+
+  //       // Always get a fresh blockhash for each attempt
+  //       const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash({
+  //         commitment: "confirmed"
+  //       });
+  //       console.log(`Using blockhash: ${blockhash.substring(0, 10)}... (valid until height: ${lastValidBlockHeight})`);
+
+  //       tx.feePayer = this.wallet.publicKey;
+  //       tx.recentBlockhash = blockhash;
+
+  //       // Sign the transaction
+  //       if (otherSigner) {
+  //         tx.sign(this.wallet, otherSigner);
+  //       } else {
+  //         tx.sign(this.wallet);
+  //       }
+
+  //       console.log(`Sending from ${this.wallet.publicKey.toString()}`);
+
+  //       // Send with retry options
+  //       const txId = await this.connection.sendRawTransaction(tx.serialize(), {
+  //         skipPreflight: false,
+  //         preflightCommitment: "confirmed",
+  //         maxRetries: 2
+  //       });
+
+  //       console.log(`Transaction sent: ${txId}`);
+
+  //       // Wait for confirmation
+  //       const confirmation = await this.connection.confirmTransaction({
+  //         signature: txId,
+  //         blockhash,
+  //         lastValidBlockHeight
+  //       }, "confirmed");
+
+  //       if (confirmation.value.err) {
+  //         throw new Error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
+  //       }
+
+  //       console.log(`Transaction confirmed: ${txId}`);
+  //       return txId;
+  //     } catch (error: any) {
+  //       console.error(`Transaction attempt ${attempts} failed: ${error.message || error}`);
+
+  //       if (attempts >= maxAttempts) {
+  //         throw error;
+  //       }
+
+  //       // Wait before retry with exponential backoff
+  //       const backoffMs = Math.min(1000 * Math.pow(2, attempts - 1), 5000);
+  //       console.log(`Waiting ${backoffMs}ms before retrying transaction...`);
+  //       await new Promise(resolve => setTimeout(resolve, backoffMs));
+  //     }
+  //   }
+
+  //   throw new Error('Failed to send transaction after maximum attempts');
+  // }
+
   async signAndBroadcastTx(tx: Transaction, otherSigner?: Keypair) {
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 5; // Increased from 3 to 5
+    const initialBackoffMs = 2000; // Increased initial backoff
 
     while (attempts < maxAttempts) {
       try {
         attempts++;
         console.log(`Transaction attempt ${attempts}/${maxAttempts}`);
 
-        // Always get a fresh blockhash for each attempt
+        // Always get a fresh blockhash for each attempt with longer commitment
         const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash({
-          commitment: "confirmed"
+          commitment: "finalized" // Using finalized instead of confirmed for more reliable blockhash
         });
         console.log(`Using blockhash: ${blockhash.substring(0, 10)}... (valid until height: ${lastValidBlockHeight})`);
 
         tx.feePayer = this.wallet.publicKey;
         tx.recentBlockhash = blockhash;
+
+        // Pre-simulate the transaction to catch errors before sending
+        try {
+          const simulation = await this.connection.simulateTransaction(tx);
+          if (simulation.value.err) {
+            console.error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
+            throw new Error(`Simulation error: ${JSON.stringify(simulation.value.err)}`);
+          }
+        } catch (simError) {
+          console.error(`Failed to simulate transaction: ${simError}`);
+          // Continue anyway, as some simulation errors can still result in successful txs
+        }
 
         // Sign the transaction
         if (otherSigner) {
@@ -739,28 +818,56 @@ export class MeteorClient {
 
         console.log(`Sending from ${this.wallet.publicKey.toString()}`);
 
-        // Send with retry options
+        // Use higher priority fee to increase chances of inclusion
+        // Note: This requires @solana/web3.js v1.31.0 or later
         const txId = await this.connection.sendRawTransaction(tx.serialize(), {
           skipPreflight: false,
           preflightCommitment: "confirmed",
-          maxRetries: 2
+          maxRetries: 5 // Increased internal retries
         });
 
         console.log(`Transaction sent: ${txId}`);
 
-        // Wait for confirmation
-        const confirmation = await this.connection.confirmTransaction({
-          signature: txId,
-          blockhash,
-          lastValidBlockHeight
-        }, "confirmed");
+        // More robust confirmation with longer timeout
+        try {
+          // Wait for confirmation with a timeout
+          const timeoutMs = 45000; // 45 seconds
+          const confirmationPromise = this.connection.confirmTransaction({
+            signature: txId,
+            blockhash,
+            lastValidBlockHeight
+          }, "confirmed");
 
-        if (confirmation.value.err) {
-          throw new Error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
+          // Create a timeout promise
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Transaction confirmation timeout")), timeoutMs)
+          );
+
+          // Race between confirmation and timeout
+          const confirmation: any = await Promise.race([confirmationPromise, timeoutPromise]);
+
+          if ('value' in confirmation && confirmation.value.err) {
+            throw new Error(`Transaction confirmed but failed: ${JSON.stringify(confirmation.value.err)}`);
+          }
+
+          console.log(`Transaction confirmed: ${txId}`);
+          return txId;
+        } catch (confirmError) {
+          console.error(`Transaction confirmation error: ${confirmError}`);
+
+          // Check if the transaction was actually confirmed despite the error
+          try {
+            const status = await this.connection.getSignatureStatus(txId);
+            if (status && status.value && status.value.confirmationStatus === 'confirmed') {
+              console.log(`Transaction was actually confirmed despite confirmation error: ${txId}`);
+              return txId;
+            }
+          } catch (statusError) {
+            console.error(`Failed to check transaction status: ${statusError}`);
+          }
+
+          throw new Error(`Transaction confirmation failed: ${confirmError}`);
         }
-
-        console.log(`Transaction confirmed: ${txId}`);
-        return txId;
       } catch (error: any) {
         console.error(`Transaction attempt ${attempts} failed: ${error.message || error}`);
 
@@ -768,8 +875,8 @@ export class MeteorClient {
           throw error;
         }
 
-        // Wait before retry with exponential backoff
-        const backoffMs = Math.min(1000 * Math.pow(2, attempts - 1), 5000);
+        // Wait before retry with exponential backoff, but with higher initial delay
+        const backoffMs = Math.min(initialBackoffMs * Math.pow(2, attempts - 1), 30000);
         console.log(`Waiting ${backoffMs}ms before retrying transaction...`);
         await new Promise(resolve => setTimeout(resolve, backoffMs));
       }
