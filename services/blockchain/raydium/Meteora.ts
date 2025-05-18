@@ -253,6 +253,107 @@ export class MeteorClient {
  * @param opts - Token options including name, symbol, supply, etc.
  * @returns PublicKey of the new mint and transaction ID
  */
+  // async createTokenWithMetadata(opts: {
+  //   name: string;
+  //   symbol: string;
+  //   decimals?: number;
+  //   supply?: number;
+  //   description?: string;
+  //   image?: string;
+  //   twitter?: string;
+  //   telegram?: string;
+  //   website?: string;
+  // }) {
+  //   try {
+  //     const mint = generateSigner(this.umi);
+
+  //     // Prepare metadata
+  //     const metadata = {
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       description: opts.description,
+  //       image: opts.image,
+  //       website: opts.website,
+  //       twitter: opts.twitter,
+  //       telegram: opts.telegram,
+  //     };
+
+  //     // Calculate token supply with decimals
+  //     const totalSupplyWithDecimals = new BN(opts.supply || 10000000000)
+  //       .mul(new BN(10).pow(new BN(opts.decimals || 9)))
+  //       .toString();
+
+  //     const uri = await uploadMetadata(metadata);
+
+  //     // Create token with metadata and mint the supply
+  //     const tx = await createAndMint(this.umi, {
+  //       mint,
+  //       authority: this.umi.identity,
+  //       name: opts.name,
+  //       symbol: opts.symbol,
+  //       uri: uri,
+  //       sellerFeeBasisPoints: percentAmount(0),
+  //       decimals: opts.decimals || 9,
+  //       amount: BigInt(totalSupplyWithDecimals),
+  //       //@ts-ignore
+  //       tokenOwner: this.wallet.publicKey,
+  //       tokenStandard: TokenStandard.Fungible,
+  //     }).send(this.umi);
+
+  //     console.log(`Successfully minted tokens (${mint.publicKey})`);
+  //     await sleep(8000);
+
+  //     if (SHOULD_REVOKE_AUTHORITY) {
+  //       // Get the mint account info to confirm the current mint authority
+  //       const mintInfo = await this.connection.getAccountInfo(new PublicKey(mint.publicKey.toString()));
+  //       if (!mintInfo) {
+  //         throw new Error("Mint account not found");
+  //       }
+
+  //       // Create a transaction to revoke mint and freeze authorities
+  //       const revokeTransaction = new Transaction();
+
+  //       // Use the wallet public key as the current authority
+  //       // This is the key that signed the mint creation transaction via UMI
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           this.wallet.publicKey,  // Use wallet public key as current authority
+  //           AuthorityType.MintTokens,
+  //           null
+  //         )
+  //       );
+
+  //       // Add instruction to revoke freeze authority
+  //       revokeTransaction.add(
+  //         createSetAuthorityInstruction(
+  //           new PublicKey(mint.publicKey.toString()),
+  //           this.wallet.publicKey,  // Use wallet public key as current authority
+  //           AuthorityType.FreezeAccount,
+  //           null
+  //         )
+  //       );
+
+  //       // Sign and send the transaction
+  //       const revokeAuthorityTxId = await this.signAndBroadcastTx(
+  //         revokeTransaction
+  //       );
+
+  //       console.log(
+  //         `Successfully revoked mint and freeze authorities (${mint.publicKey})`
+  //       );
+  //     }
+
+  //     return {
+  //       mintAddress: mint.publicKey.toString(),
+  //       txId: tx,
+  //     };
+  //   } catch (error) {
+  //     console.error("Error minting tokens:", error);
+  //     throw error;
+  //   }
+  // }
+
   async createTokenWithMetadata(opts: {
     name: string;
     symbol: string;
@@ -301,24 +402,63 @@ export class MeteorClient {
       }).send(this.umi);
 
       console.log(`Successfully minted tokens (${mint.publicKey})`);
-      await sleep(8000);
+
+      // Wait for transaction confirmation with retries
+      let confirmed = false;
+      let attempts = 0;
+      const maxAttempts = 5;
+
+      // Extract the transaction signature as a string
+      const txSignature = tx.toString();
+
+      while (!confirmed && attempts < maxAttempts) {
+        try {
+          attempts++;
+          console.log(`Waiting for transaction confirmation, attempt ${attempts}/${maxAttempts}...`);
+
+          // Use the standard confirmTransaction method with just the signature
+          const confirmation = await this.connection.confirmTransaction(txSignature, 'confirmed');
+
+          if (confirmation.value.err) {
+            console.warn(`Transaction confirmed but has errors: ${JSON.stringify(confirmation.value.err)}`);
+          } else {
+            console.log(`Transaction successfully confirmed after ${attempts} attempts`);
+            confirmed = true;
+          }
+        } catch (error: any) {
+          console.error(`Confirmation attempt ${attempts} failed: ${error.message || error}`);
+
+          if (attempts >= maxAttempts) {
+            throw new Error(`Failed to confirm transaction after ${maxAttempts} attempts`);
+          }
+
+          // Wait before retry with exponential backoff
+          const backoffMs = Math.min(1000 * Math.pow(2, attempts - 1), 10000);
+          console.log(`Waiting ${backoffMs}ms before retrying confirmation...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
+
+      // Only proceed with mint authority revocation if transaction is confirmed
+      if (!confirmed) {
+        throw new Error("Transaction could not be confirmed");
+      }
+
+      // After confirmation, fetch the mint account info
+      const mintInfo = await this.connection.getAccountInfo(new PublicKey(mint.publicKey.toString()));
+      if (!mintInfo) {
+        throw new Error("Mint account not found even after transaction confirmation");
+      }
 
       if (SHOULD_REVOKE_AUTHORITY) {
-        // Get the mint account info to confirm the current mint authority
-        const mintInfo = await this.connection.getAccountInfo(new PublicKey(mint.publicKey.toString()));
-        if (!mintInfo) {
-          throw new Error("Mint account not found");
-        }
-
         // Create a transaction to revoke mint and freeze authorities
         const revokeTransaction = new Transaction();
 
         // Use the wallet public key as the current authority
-        // This is the key that signed the mint creation transaction via UMI
         revokeTransaction.add(
           createSetAuthorityInstruction(
             new PublicKey(mint.publicKey.toString()),
-            this.wallet.publicKey,  // Use wallet public key as current authority
+            this.wallet.publicKey,
             AuthorityType.MintTokens,
             null
           )
@@ -328,7 +468,7 @@ export class MeteorClient {
         revokeTransaction.add(
           createSetAuthorityInstruction(
             new PublicKey(mint.publicKey.toString()),
-            this.wallet.publicKey,  // Use wallet public key as current authority
+            this.wallet.publicKey,
             AuthorityType.FreezeAccount,
             null
           )
@@ -339,9 +479,7 @@ export class MeteorClient {
           revokeTransaction
         );
 
-        console.log(
-          `Successfully revoked mint and freeze authorities (${mint.publicKey})`
-        );
+        console.log(`Successfully revoked mint and freeze authorities (${mint.publicKey})`);
       }
 
       return {
